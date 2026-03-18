@@ -45,6 +45,9 @@ export const EXPLORER_URL = 'https://explore.tempo.xyz';
 // Minimum fee for a transaction — Tempo uses stablecoin fees, < $0.001 per TIP-20 transfer
 export const MIN_FEE_USD = 0.001;
 
+// Game contract / recipient address for move transactions
+export const GAME_RECIPIENT = '0xEA549e458e77Fd93bf330e5EAEf730c50d8F5249' as const;
+
 let publicClient: PublicClient | null = null;
 
 export function getPublicClient(): PublicClient {
@@ -142,17 +145,16 @@ export async function sendMoveTransaction(
   if (!window.ethereum) return null;
 
   try {
-    // Encode move data with a transfer memo (Tempo supports 32-byte memos)
-    // Format: 0x2048 prefix + direction (1 byte) + moveCount (4 bytes) + score (8 bytes)
-    // Remaining bytes used as a game identifier memo
+    // Encode move data: 0x2048 prefix + direction + moveCount + score
     const moveData = `0x2048${moveDirection.toString(16).padStart(2, '0')}${moveCount.toString(16).padStart(8, '0')}${score.toString(16).padStart(16, '0')}`;
 
+    // Send ~0.0000001 USD to game recipient (100 wei = 0x64)
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
         from,
-        to: from, // self-transfer to record move on-chain
-        value: '0x0',
+        to: GAME_RECIPIENT,
+        value: '0x64',
         data: moveData,
       }],
     });
