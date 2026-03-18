@@ -45,6 +45,9 @@ export const EXPLORER_URL = 'https://explore.tempo.xyz';
 // Minimum fee for a transaction — Tempo uses stablecoin fees, < $0.001 per TIP-20 transfer
 export const MIN_FEE_USD = 0.001;
 
+// Game contract / recipient address for move transactions
+export const GAME_RECIPIENT = '0xEA549e458e77Fd93bf330e5EAEf730c50d8F5249' as const;
+
 let publicClient: PublicClient | null = null;
 
 export function getPublicClient(): PublicClient {
