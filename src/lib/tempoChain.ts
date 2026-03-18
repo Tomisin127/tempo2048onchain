@@ -3,6 +3,9 @@ import { createPublicClient, http, defineChain, formatEther, formatUnits, type P
 // USDC contract on Tempo Mainnet (TIP-20 stablecoin)
 export const USDC_ADDRESS = '0x9A40946455c5aEe19648C92261fC0AD24a7e44F2' as const;
 
+// USDC.e (Stargate-bridged) on Tempo Mainnet
+export const USDCE_ADDRESS = '0xbB5d04F616f00e1e3813b44c2b24756883c50D7C' as const;
+
 // Minimal ERC20 ABI for balance reading
 const ERC20_ABI = [
   {
