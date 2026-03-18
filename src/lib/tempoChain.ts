@@ -42,8 +42,8 @@ export const CHAIN_ID_HEX = '0x1079';
 export const CHAIN_ID = 4217;
 export const EXPLORER_URL = 'https://explore.tempo.xyz';
 
-// Minimum gas needed for a move transaction (~21000 gas * gas price)
-export const MIN_GAS_USD = 0.0001; // Very low on Tempo
+// Minimum fee for a transaction — Tempo uses stablecoin fees, < $0.001 per TIP-20 transfer
+export const MIN_FEE_USD = 0.001;
 
 let publicClient: PublicClient | null = null;
 
