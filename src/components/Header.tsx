@@ -8,7 +8,7 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ score, bestScore, onNewGame }) => {
-  const { address, balance, connected, connecting, connect, disconnect, chainCorrect } = useWallet();
+  const { address, balance, usdcBalance, connected, connecting, connect, disconnect, chainCorrect, hasGas } = useWallet();
 
   return (
     <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -53,6 +53,16 @@ const Header: React.FC<HeaderProps> = ({ score, bestScore, onNewGame }) => {
             <div className="font-mono text-sm font-semibold text-primary">
               ${balance} USD
             </div>
+            {parseFloat(usdcBalance) > 0 && (
+              <div className="font-mono text-[10px] text-muted-foreground">
+                {usdcBalance} USDC
+              </div>
+            )}
+            {!hasGas && (
+              <div className="font-mono text-[10px] text-destructive">
+                ⚠ Low gas
+              </div>
+            )}
           </div>
         )}
         <button

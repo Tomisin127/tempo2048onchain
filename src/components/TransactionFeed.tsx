@@ -1,4 +1,5 @@
 import React from 'react';
+import { EXPLORER_URL } from '@/lib/tempoChain';
 
 export interface TxRecord {
   hash: string;
@@ -69,7 +70,7 @@ const TransactionFeed: React.FC<TransactionFeedProps> = ({ transactions }) => {
 
             <div className="mt-1">
               <a
-                href={`https://explorer.tempo.xyz/tx/${tx.hash}`}
+                href={`${EXPLORER_URL}/tx/${tx.hash}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="text-[10px] font-mono text-primary hover:underline truncate block"
