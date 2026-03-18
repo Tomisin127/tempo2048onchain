@@ -98,7 +98,7 @@ const Index = () => {
 
       return result;
     });
-  }, [wallet.connected, wallet.address, wallet.chainCorrect, wallet.hasGas, wallet.connect, wallet.refreshBalance]);
+  }, [wallet.connected, wallet.address, wallet.chainCorrect, wallet.hasFees, wallet.connect, wallet.refreshBalance]);
 
   // Keyboard controls
   useEffect(() => {

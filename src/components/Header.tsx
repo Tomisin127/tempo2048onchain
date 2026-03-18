@@ -8,7 +8,10 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ score, bestScore, onNewGame }) => {
-  const { address, balance, usdcBalance, connected, connecting, connect, disconnect, chainCorrect, hasGas } = useWallet();
+  const { address, balance, usdcBalance, usdceBalance, connected, connecting, connect, disconnect, chainCorrect, hasFees } = useWallet();
+
+  // Total stablecoin balance available for fees
+  const totalStable = (parseFloat(balance) + parseFloat(usdcBalance) + parseFloat(usdceBalance)).toFixed(4);
 
   return (
     <header className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 mb-6">
@@ -51,16 +54,16 @@ const Header: React.FC<HeaderProps> = ({ score, bestScore, onNewGame }) => {
               {address?.slice(0, 6)}...{address?.slice(-4)}
             </div>
             <div className="font-mono text-sm font-semibold text-primary">
-              ${balance} USD
+              ${totalStable} USD
             </div>
-            {parseFloat(usdcBalance) > 0 && (
-              <div className="font-mono text-[10px] text-muted-foreground">
-                {usdcBalance} USDC
-              </div>
-            )}
-            {!hasGas && (
+            <div className="font-mono text-[10px] text-muted-foreground space-x-2">
+              {parseFloat(balance) > 0 && <span>{balance} native</span>}
+              {parseFloat(usdcBalance) > 0 && <span>{usdcBalance} USDC</span>}
+              {parseFloat(usdceBalance) > 0 && <span>{usdceBalance} USDC.e</span>}
+            </div>
+            {!hasFees && (
               <div className="font-mono text-[10px] text-destructive">
-                ⚠ Low gas
+                ⚠ Insufficient stablecoin for fees
               </div>
             )}
           </div>
