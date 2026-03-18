@@ -1,4 +1,18 @@
-import { createPublicClient, http, defineChain, formatEther, type PublicClient } from 'viem';
+import { createPublicClient, http, defineChain, formatEther, formatUnits, type PublicClient } from 'viem';
+
+// USDC contract on Tempo Mainnet (TIP-20 stablecoin)
+export const USDC_ADDRESS = '0x9A40946455c5aEe19648C92261fC0AD24a7e44F2' as const;
+
+// Minimal ERC20 ABI for balance reading
+const ERC20_ABI = [
+  {
+    name: 'balanceOf',
+    type: 'function',
+    stateMutability: 'view',
+    inputs: [{ name: 'account', type: 'address' }],
+    outputs: [{ name: '', type: 'uint256' }],
+  },
+] as const;
 
 export const tempoMainnet = defineChain({
   id: 4217,
@@ -16,13 +30,17 @@ export const tempoMainnet = defineChain({
   blockExplorers: {
     default: {
       name: 'Tempo Explorer',
-      url: 'https://explorer.tempo.xyz',
+      url: 'https://explore.tempo.xyz',
     },
   },
 });
 
 export const CHAIN_ID_HEX = '0x1079';
 export const CHAIN_ID = 4217;
+export const EXPLORER_URL = 'https://explore.tempo.xyz';
+
+// Minimum gas needed for a move transaction (~21000 gas * gas price)
+export const MIN_GAS_USD = 0.0001; // Very low on Tempo
 
 let publicClient: PublicClient | null = null;
 
@@ -46,6 +64,33 @@ export async function getBalance(address: string): Promise<string> {
   }
 }
 
+export async function getUSDCBalance(address: string): Promise<string> {
+  const client = getPublicClient();
+  try {
+    const balance = await (client as any).readContract({
+      address: USDC_ADDRESS,
+      abi: ERC20_ABI,
+      functionName: 'balanceOf',
+      args: [address as `0x${string}`],
+    });
+    return parseFloat(formatUnits(balance as bigint, 6)).toFixed(2);
+  } catch {
+    return '0.00';
+  }
+}
+
+export async function estimateGasCost(): Promise<string> {
+  const client = getPublicClient();
+  try {
+    const gasPrice = await client.getGasPrice();
+    // Simple transaction gas limit ~21000
+    const cost = gasPrice * BigInt(21000);
+    return parseFloat(formatEther(cost)).toFixed(6);
+  } catch {
+    return '0.000001';
+  }
+}
+
 export async function switchToTempo(): Promise<boolean> {
   if (!window.ethereum) return false;
 
@@ -65,7 +110,7 @@ export async function switchToTempo(): Promise<boolean> {
             chainName: 'Tempo Mainnet',
             nativeCurrency: { name: 'USD', symbol: 'USD', decimals: 18 },
             rpcUrls: ['https://rpc.tempo.xyz'],
-            blockExplorerUrls: ['https://explorer.tempo.xyz'],
+            blockExplorerUrls: ['https://explore.tempo.xyz'],
           }],
         });
         return true;
@@ -86,7 +131,9 @@ export async function sendMoveTransaction(
   if (!window.ethereum) return null;
 
   try {
-    // Encode move data in the transaction data field
+    // Encode move data with a transfer memo (Tempo supports 32-byte memos)
+    // Format: 0x2048 prefix + direction (1 byte) + moveCount (4 bytes) + score (8 bytes)
+    // Remaining bytes used as a game identifier memo
     const moveData = `0x2048${moveDirection.toString(16).padStart(2, '0')}${moveCount.toString(16).padStart(8, '0')}${score.toString(16).padStart(16, '0')}`;
 
     const txHash = await window.ethereum.request({
@@ -103,6 +150,26 @@ export async function sendMoveTransaction(
   } catch (err) {
     console.error('Transaction failed:', err);
     return null;
+  }
+}
+
+export async function getGasPrice(): Promise<string> {
+  const client = getPublicClient();
+  try {
+    const gasPrice = await client.getGasPrice();
+    return parseFloat(formatEther(gasPrice * BigInt(1e9))).toFixed(6);
+  } catch {
+    return '0.000000';
+  }
+}
+
+export async function getBlockNumber(): Promise<number> {
+  const client = getPublicClient();
+  try {
+    const block = await client.getBlockNumber();
+    return Number(block);
+  } catch {
+    return 0;
   }
 }
 

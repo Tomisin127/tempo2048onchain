@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import GameBoard from '@/components/GameBoard';
 import Header from '@/components/Header';
 import TransactionFeed, { type TxRecord } from '@/components/TransactionFeed';
+import NetworkStatus from '@/components/NetworkStatus';
 import { initGame, move, directionToNumber, type Direction, type GameState } from '@/lib/gameEngine';
 import { sendMoveTransaction } from '@/lib/tempoChain';
 import { useWallet } from '@/hooks/useWallet';
@@ -19,12 +20,40 @@ const Index = () => {
   }, []);
 
   const handleMove = useCallback(async (direction: Direction) => {
+    // Block moves if wallet not connected
+    if (!wallet.connected) {
+      toast.error('Connect your wallet to play!', {
+        description: 'Every move is an on-chain transaction on Tempo Mainnet.',
+        action: {
+          label: 'Connect',
+          onClick: () => wallet.connect(),
+        },
+      });
+      return;
+    }
+
+    // Check if on correct chain
+    if (!wallet.chainCorrect) {
+      toast.error('Wrong network!', {
+        description: 'Please switch to Tempo Mainnet (Chain ID 4217).',
+      });
+      return;
+    }
+
+    // Check gas balance
+    if (!wallet.hasGas) {
+      toast.error('Insufficient gas!', {
+        description: 'You need USD (native token) for gas fees on Tempo. Bridge funds or use the Tempo faucet.',
+      });
+      return;
+    }
+
     setGame(prev => {
       const result = move(prev, direction);
       if (!result) return prev;
 
-      // Fire transaction in background (optimistic UI)
-      if (wallet.connected && wallet.address) {
+      // Fire transaction
+      if (wallet.address) {
         setPendingTx(true);
         const moveNum = result.moveCount;
         const score = result.score;
@@ -47,21 +76,29 @@ const Index = () => {
             };
             setTransactions(prev => [txRecord, ...prev].slice(0, 50));
 
+            // Refresh balance after tx
+            if (wallet.address) {
+              wallet.refreshBalance(wallet.address);
+            }
+
             // Mark confirmed after delay (optimistic)
             setTimeout(() => {
               setTransactions(prev =>
                 prev.map(tx => tx.hash === hash ? { ...tx, status: 'confirmed' as const } : tx)
               );
             }, 3000);
+          } else {
+            toast.error('Transaction rejected or failed');
           }
         }).catch(() => {
           setPendingTx(false);
+          toast.error('Transaction failed');
         });
       }
 
       return result;
     });
-  }, [wallet.connected, wallet.address]);
+  }, [wallet.connected, wallet.address, wallet.chainCorrect, wallet.hasGas, wallet.connect, wallet.refreshBalance]);
 
   // Keyboard controls
   useEffect(() => {
@@ -146,6 +183,8 @@ const Index = () => {
               gameOver={game.gameOver}
               won={game.won}
               onNewGame={handleNewGame}
+              walletConnected={wallet.connected}
+              onConnect={wallet.connect}
             />
 
             {/* Controls hint */}
@@ -155,19 +194,36 @@ const Index = () => {
               <span>Moves: {game.moveCount}</span>
             </div>
 
-            {!wallet.connected && (
-              <div className="bg-card border border-border rounded-lg p-4 max-w-sm text-center">
-                <p className="text-sm text-muted-foreground font-display">
-                  Connect your wallet to record every move as a transaction on{' '}
-                  <span className="text-primary font-semibold">Tempo Mainnet</span>
+            {/* Gas warning */}
+            {wallet.connected && !wallet.hasGas && (
+              <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 max-w-sm text-center">
+                <p className="text-sm text-destructive font-display font-semibold">
+                  ⚠️ Insufficient gas
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  You need USD (native token) to pay gas fees on Tempo.{' '}
+                  <a
+                    href="https://docs.tempo.xyz/guide/getting-funds"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:underline"
+                  >
+                    Get funds →
+                  </a>
                 </p>
               </div>
             )}
           </div>
 
-          {/* Transaction feed */}
-          <div className="w-full lg:w-80 lg:h-[500px]">
-            <TransactionFeed transactions={transactions} />
+          {/* Right sidebar */}
+          <div className="w-full lg:w-80 flex flex-col gap-4">
+            {/* Network Status */}
+            <NetworkStatus />
+
+            {/* Transaction feed */}
+            <div className="lg:h-[360px]">
+              <TransactionFeed transactions={transactions} />
+            </div>
           </div>
         </div>
       </div>
@@ -175,7 +231,14 @@ const Index = () => {
       {/* Footer */}
       <footer className="mt-auto py-4 text-center">
         <p className="text-xs font-mono text-muted-foreground">
-          On-Chain 2048 • Tempo Mainnet • Chain ID 4217 (0x1079)
+          On-Chain 2048 • Tempo Mainnet • Chain ID 4217 (0x1079) •{' '}
+          <a href="https://docs.tempo.xyz" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+            Docs
+          </a>
+          {' • '}
+          <a href="https://mpp.dev" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+            MPP Protocol
+          </a>
         </p>
       </footer>
     </div>

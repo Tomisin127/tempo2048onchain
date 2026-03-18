@@ -1,21 +1,25 @@
 import { useState, useEffect, useCallback } from 'react';
-import { getBalance, switchToTempo, CHAIN_ID_HEX } from '@/lib/tempoChain';
+import { getBalance, getUSDCBalance, switchToTempo, CHAIN_ID_HEX, MIN_GAS_USD } from '@/lib/tempoChain';
 
 interface WalletState {
   address: string | null;
   balance: string;
+  usdcBalance: string;
   connected: boolean;
   connecting: boolean;
   chainCorrect: boolean;
+  hasGas: boolean;
 }
 
 export function useWallet() {
   const [state, setState] = useState<WalletState>({
     address: null,
     balance: '0.0000',
+    usdcBalance: '0.00',
     connected: false,
     connecting: false,
     chainCorrect: false,
+    hasGas: false,
   });
 
   const checkChain = useCallback(async () => {
@@ -29,8 +33,12 @@ export function useWallet() {
   }, []);
 
   const refreshBalance = useCallback(async (addr: string) => {
-    const bal = await getBalance(addr);
-    setState(s => ({ ...s, balance: bal }));
+    const [bal, usdcBal] = await Promise.all([
+      getBalance(addr),
+      getUSDCBalance(addr),
+    ]);
+    const hasGas = parseFloat(bal) >= MIN_GAS_USD;
+    setState(s => ({ ...s, balance: bal, usdcBalance: usdcBal, hasGas }));
   }, []);
 
   const connect = useCallback(async () => {
@@ -50,14 +58,20 @@ export function useWallet() {
 
       const switched = await switchToTempo();
       const address = accounts[0];
-      const bal = await getBalance(address);
+      const [bal, usdcBal] = await Promise.all([
+        getBalance(address),
+        getUSDCBalance(address),
+      ]);
+      const hasGas = parseFloat(bal) >= MIN_GAS_USD;
 
       setState({
         address,
         balance: bal,
+        usdcBalance: usdcBal,
         connected: true,
         connecting: false,
         chainCorrect: switched,
+        hasGas,
       });
     } catch {
       setState(s => ({ ...s, connecting: false }));
@@ -68,9 +82,11 @@ export function useWallet() {
     setState({
       address: null,
       balance: '0.0000',
+      usdcBalance: '0.00',
       connected: false,
       connecting: false,
       chainCorrect: false,
+      hasGas: false,
     });
   }, []);
 
@@ -81,9 +97,13 @@ export function useWallet() {
       if (accounts.length === 0) {
         disconnect();
       } else {
-        const bal = await getBalance(accounts[0]);
+        const [bal, usdcBal] = await Promise.all([
+          getBalance(accounts[0]),
+          getUSDCBalance(accounts[0]),
+        ]);
         const correct = await checkChain();
-        setState({ address: accounts[0], balance: bal, connected: true, connecting: false, chainCorrect: correct });
+        const hasGas = parseFloat(bal) >= MIN_GAS_USD;
+        setState({ address: accounts[0], balance: bal, usdcBalance: usdcBal, connected: true, connecting: false, chainCorrect: correct, hasGas });
       }
     };
 
