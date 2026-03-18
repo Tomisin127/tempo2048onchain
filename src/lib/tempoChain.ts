@@ -148,7 +148,9 @@ export async function sendMoveTransaction(
     // Encode move data: 0x2048 prefix + direction + moveCount + score
     const moveData = `0x2048${moveDirection.toString(16).padStart(2, '0')}${moveCount.toString(16).padStart(8, '0')}${score.toString(16).padStart(16, '0')}`;
 
-    // Send ~0.0000001 USD to game recipient (100 wei = 0x64)
+    // Explicit gas limit to avoid estimation failure on EOA with data
+    const gasLimit = '0x' + (30000).toString(16); // 30000 gas units
+
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
@@ -156,12 +158,13 @@ export async function sendMoveTransaction(
         to: GAME_RECIPIENT,
         value: '0x64',
         data: moveData,
+        gas: gasLimit,
       }],
     });
 
     return txHash as string;
-  } catch (err) {
-    console.error('Transaction failed:', err);
+  } catch (err: any) {
+    console.error('Transaction failed:', err?.message || err);
     return null;
   }
 }
