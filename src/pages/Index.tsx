@@ -40,10 +40,10 @@ const Index = () => {
       return;
     }
 
-    // Check gas balance
-    if (!wallet.hasGas) {
-      toast.error('Insufficient gas!', {
-        description: 'You need USD (native token) for gas fees on Tempo. Bridge funds or use the Tempo faucet.',
+    // Check fee balance (any stablecoin works on Tempo)
+    if (!wallet.hasFees) {
+      toast.error('Insufficient stablecoin balance!', {
+        description: 'You need any supported stablecoin (USD, USDC, or USDC.e) for fees on Tempo. Fees are < $0.001 per move.',
       });
       return;
     }
