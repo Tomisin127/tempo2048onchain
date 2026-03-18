@@ -68,10 +68,18 @@ export async function getBalance(address: string): Promise<string> {
 }
 
 export async function getUSDCBalance(address: string): Promise<string> {
+  return getTokenBalance(address, USDC_ADDRESS);
+}
+
+export async function getUSDCeBalance(address: string): Promise<string> {
+  return getTokenBalance(address, USDCE_ADDRESS);
+}
+
+async function getTokenBalance(address: string, tokenAddress: `0x${string}`): Promise<string> {
   const client = getPublicClient();
   try {
     const balance = await (client as any).readContract({
-      address: USDC_ADDRESS,
+      address: tokenAddress,
       abi: ERC20_ABI,
       functionName: 'balanceOf',
       args: [address as `0x${string}`],
