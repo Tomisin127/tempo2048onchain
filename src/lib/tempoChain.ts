@@ -145,26 +145,28 @@ export async function sendMoveTransaction(
   if (!window.ethereum) return null;
 
   try {
-    // Encode move data: 0x2048 prefix + direction + moveCount + score
-    const moveData = `0x2048${moveDirection.toString(16).padStart(2, '0')}${moveCount.toString(16).padStart(8, '0')}${score.toString(16).padStart(16, '0')}`;
+    // Simple native transfer to game address — no data field to avoid node rejection
+    // Value encodes the move: direction (1 digit) + moveCount (4 digits) + score (remaining)
+    // e.g. direction=2, move=5, score=128 → value in wei is trivially small
+    const valueWei = BigInt(moveDirection) * BigInt(1e12) + BigInt(moveCount) * BigInt(1e8) + BigInt(score);
+    const valueHex = '0x' + valueWei.toString(16);
 
-    // Explicit gas limit to avoid estimation failure on EOA with data
-    const gasLimit = '0x' + (30000).toString(16); // 30000 gas units
+    console.log('[2048] Sending move tx:', { from, to: GAME_RECIPIENT, value: valueHex, direction: moveDirection, moveCount, score });
 
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
         from,
         to: GAME_RECIPIENT,
-        value: '0x64',
-        data: moveData,
-        gas: gasLimit,
+        value: valueHex,
+        gas: '0x5208', // 21000 — standard transfer gas
       }],
     });
 
+    console.log('[2048] Tx sent:', txHash);
     return txHash as string;
   } catch (err: any) {
-    console.error('Transaction failed:', err?.message || err);
+    console.error('[2048] Transaction failed:', err?.code, err?.message, err);
     return null;
   }
 }
