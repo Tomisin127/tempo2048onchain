@@ -56,12 +56,12 @@ const NetworkStatus: React.FC = () => {
 
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground font-mono">Gas Token</span>
-          <span className="text-xs font-mono text-foreground">USD</span>
+          <span className="text-xs font-mono text-foreground">Any Stablecoin</span>
         </div>
 
         <div className="flex items-center justify-between">
           <span className="text-xs text-muted-foreground font-mono">Fee Model</span>
-          <span className="text-xs font-mono text-foreground">Stablecoin Gas</span>
+          <span className="text-xs font-mono text-foreground">&lt; $0.001/tx</span>
         </div>
       </div>
     </div>

@@ -3,6 +3,9 @@ import { createPublicClient, http, defineChain, formatEther, formatUnits, type P
 // USDC contract on Tempo Mainnet (TIP-20 stablecoin)
 export const USDC_ADDRESS = '0x9A40946455c5aEe19648C92261fC0AD24a7e44F2' as const;
 
+// USDC.e (Stargate-bridged) on Tempo Mainnet
+export const USDCE_ADDRESS = '0xbB5d04F616f00e1e3813b44c2b24756883c50D7C' as const;
+
 // Minimal ERC20 ABI for balance reading
 const ERC20_ABI = [
   {
@@ -39,8 +42,8 @@ export const CHAIN_ID_HEX = '0x1079';
 export const CHAIN_ID = 4217;
 export const EXPLORER_URL = 'https://explore.tempo.xyz';
 
-// Minimum gas needed for a move transaction (~21000 gas * gas price)
-export const MIN_GAS_USD = 0.0001; // Very low on Tempo
+// Minimum fee for a transaction — Tempo uses stablecoin fees, < $0.001 per TIP-20 transfer
+export const MIN_FEE_USD = 0.001;
 
 let publicClient: PublicClient | null = null;
 
@@ -65,10 +68,18 @@ export async function getBalance(address: string): Promise<string> {
 }
 
 export async function getUSDCBalance(address: string): Promise<string> {
+  return getTokenBalance(address, USDC_ADDRESS);
+}
+
+export async function getUSDCeBalance(address: string): Promise<string> {
+  return getTokenBalance(address, USDCE_ADDRESS);
+}
+
+async function getTokenBalance(address: string, tokenAddress: `0x${string}`): Promise<string> {
   const client = getPublicClient();
   try {
     const balance = await (client as any).readContract({
-      address: USDC_ADDRESS,
+      address: tokenAddress,
       abi: ERC20_ABI,
       functionName: 'balanceOf',
       args: [address as `0x${string}`],

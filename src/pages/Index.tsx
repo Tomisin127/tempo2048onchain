@@ -40,10 +40,10 @@ const Index = () => {
       return;
     }
 
-    // Check gas balance
-    if (!wallet.hasGas) {
-      toast.error('Insufficient gas!', {
-        description: 'You need USD (native token) for gas fees on Tempo. Bridge funds or use the Tempo faucet.',
+    // Check fee balance (any stablecoin works on Tempo)
+    if (!wallet.hasFees) {
+      toast.error('Insufficient stablecoin balance!', {
+        description: 'You need any supported stablecoin (USD, USDC, or USDC.e) for fees on Tempo. Fees are < $0.001 per move.',
       });
       return;
     }
@@ -98,7 +98,7 @@ const Index = () => {
 
       return result;
     });
-  }, [wallet.connected, wallet.address, wallet.chainCorrect, wallet.hasGas, wallet.connect, wallet.refreshBalance]);
+  }, [wallet.connected, wallet.address, wallet.chainCorrect, wallet.hasFees, wallet.connect, wallet.refreshBalance]);
 
   // Keyboard controls
   useEffect(() => {
@@ -195,20 +195,20 @@ const Index = () => {
             </div>
 
             {/* Gas warning */}
-            {wallet.connected && !wallet.hasGas && (
+            {wallet.connected && !wallet.hasFees && (
               <div className="bg-destructive/10 border border-destructive/30 rounded-lg p-3 max-w-sm text-center">
                 <p className="text-sm text-destructive font-display font-semibold">
-                  ⚠️ Insufficient gas
+                  ⚠️ Insufficient stablecoin for fees
                 </p>
                 <p className="text-xs text-muted-foreground mt-1">
-                  You need USD (native token) to pay gas fees on Tempo.{' '}
+                  Tempo fees can be paid in any supported stablecoin (USD, USDC, or USDC.e). Fees are &lt; $0.001 per move.{' '}
                   <a
-                    href="https://docs.tempo.xyz/guide/getting-funds"
+                    href="https://docs.tempo.xyz/protocol/fees"
                     target="_blank"
                     rel="noopener noreferrer"
                     className="text-primary hover:underline"
                   >
-                    Get funds →
+                    Learn about fees →
                   </a>
                 </p>
               </div>
