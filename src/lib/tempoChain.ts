@@ -145,21 +145,24 @@ export async function sendMoveTransaction(
   if (!window.ethereum) return null;
 
   try {
-    // Simple native transfer to game address — no data field to avoid node rejection
-    // Value encodes the move: direction (1 digit) + moveCount (4 digits) + score (remaining)
-    // e.g. direction=2, move=5, score=128 → value in wei is trivially small
-    const valueWei = BigInt(moveDirection) * BigInt(1e12) + BigInt(moveCount) * BigInt(1e8) + BigInt(score);
-    const valueHex = '0x' + valueWei.toString(16);
+    // Per Tempo docs: EIP-1559 tx with maxFeePerGas + maxPriorityFeePerGas
+    // Simple zero-value transfer to game address to record the move on-chain
+    // Gas params from docs: maxFeePerGas=20 gwei, maxPriorityFeePerGas=1 gwei
+    const maxFeePerGas = '0x' + (20000000000).toString(16);       // 20 gwei
+    const maxPriorityFeePerGas = '0x' + (1000000000).toString(16); // 1 gwei
 
-    console.log('[2048] Sending move tx:', { from, to: GAME_RECIPIENT, value: valueHex, direction: moveDirection, moveCount, score });
+    console.log('[2048] Sending move tx:', { from, to: GAME_RECIPIENT, direction: moveDirection, moveCount, score });
 
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
         from,
         to: GAME_RECIPIENT,
-        value: valueHex,
-        gas: '0x5208', // 21000 — standard transfer gas
+        value: '0x0',
+        gas: '0x5208', // 21000 standard transfer
+        maxFeePerGas,
+        maxPriorityFeePerGas,
+        type: '0x2', // EIP-1559
       }],
     });
 
