@@ -145,24 +145,16 @@ export async function sendMoveTransaction(
   if (!window.ethereum) return null;
 
   try {
-    // Per Tempo docs: EIP-1559 tx with maxFeePerGas + maxPriorityFeePerGas
-    // Simple zero-value transfer to game address to record the move on-chain
-    // Gas params from docs: maxFeePerGas=20 gwei, maxPriorityFeePerGas=1 gwei
-    const maxFeePerGas = '0x' + (20000000000).toString(16);       // 20 gwei
-    const maxPriorityFeePerGas = '0x' + (1000000000).toString(16); // 1 gwei
-
     console.log('[2048] Sending move tx:', { from, to: GAME_RECIPIENT, direction: moveDirection, moveCount, score });
 
+    // Let MetaMask handle gas estimation and fee params automatically.
+    // Only specify from, to, and value — the wallet + Tempo RPC will negotiate the rest.
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
         from,
         to: GAME_RECIPIENT,
         value: '0x0',
-        gas: '0x5208', // 21000 standard transfer
-        maxFeePerGas,
-        maxPriorityFeePerGas,
-        type: '0x2', // EIP-1559
       }],
     });
 
