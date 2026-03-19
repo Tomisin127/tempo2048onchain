@@ -125,48 +125,22 @@ export async function sendMoveTransaction(
   if (!window.ethereum) return null;
 
   try {
-    const client = getPublicClient();
-    
-    // 1. Get the CONFIRMED nonce (not 'pending') to ensure sequential ordering
-    // This ensures each transaction has a unique, incrementing nonce
-    const nonce = await client.getTransactionCount({
-      address: from as `0x${string}`,
-      blockTag: 'latest',
-    });
-    console.log('[2048] Current nonce for', from, ':', nonce);
+    // 1. Get the confirmed nonce via direct RPC — ensures unique nonce per tx
+    const nonceHex = await rpcCall('eth_getTransactionCount', [from, 'latest']);
+    const nonce = hexToDecimal(nonceHex);
 
-    // 2. Get current gas prices from the network
-    const gasPrice = await client.getGasPrice();
-    // Use 1.2x current gas price for safety
+    // 2. Get gas price via direct RPC and apply 1.2x multiplier
+    const gasPriceHex = await rpcCall('eth_gasPrice', []);
+    const gasPrice = hexToBigInt(gasPriceHex);
     const maxFeePerGas = (gasPrice * BigInt(120)) / BigInt(100);
-    const maxPriorityFeePerGas = (gasPrice / BigInt(10)); // 10% priority bump
+    const maxPriorityFeePerGas = gasPrice / BigInt(10);
 
-    // 3. Encode move data - This is the calldata sent to the game contract
-    // Standard ABI encoding with function selector + parameters
-    const moveData = encodeAbiParameters(
-      [
-        { type: 'uint8', name: 'direction' },
-        { type: 'uint32', name: 'moveCount' },
-        { type: 'uint32', name: 'score' },
-      ],
-      [moveDirection, moveCount, score]
-    );
+    // 3. Encode move data as packed bytes (direction + moveCount + score)
+    const moveData = encodeMoveData(moveDirection, moveCount, score);
 
-    console.log('[v0] Preparing transaction:', { 
-      from, 
-      to: GAME_RECIPIENT, 
-      nonce,
-      direction: moveDirection, 
-      moveCount, 
-      score,
-      gasPrice: gasPrice.toString(),
-      maxFeePerGas: maxFeePerGas.toString(),
-      maxPriorityFeePerGas: maxPriorityFeePerGas.toString(),
-      dataLength: moveData.length,
-    });
+    console.log('[v0] Sending tx — nonce:', nonce, 'direction:', moveDirection, 'moveCount:', moveCount, 'score:', score);
 
-    // 4. Send transaction with all required parameters
-    // The key is to use 'latest' blockTag for nonce to ensure proper sequencing
+    // 4. Send transaction via MetaMask with all required EIP-1559 fields
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
@@ -174,17 +148,17 @@ export async function sendMoveTransaction(
         to: GAME_RECIPIENT,
         value: '0x0',
         data: moveData,
-        gas: '0x186a0', // 100,000 gas (standard for contract calls)
+        gas: '0x186a0', // 100,000 gas
         nonce: '0x' + nonce.toString(16),
         maxFeePerGas: '0x' + maxFeePerGas.toString(16),
         maxPriorityFeePerGas: '0x' + maxPriorityFeePerGas.toString(16),
       }],
     });
 
-    console.log('[v0] Transaction sent with hash:', txHash, 'nonce:', nonce);
+    console.log('[v0] Tx hash:', txHash, '| nonce used:', nonce);
     return txHash as string;
   } catch (err: any) {
-    console.error('[v0] Transaction failed:', err?.code, err?.message, err);
+    console.error('[v0] Transaction failed:', err?.code, err?.message);
     return null;
   }
 }
