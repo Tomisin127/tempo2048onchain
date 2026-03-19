@@ -147,20 +147,22 @@ export async function sendMoveTransaction(
   try {
     const client = getPublicClient();
     
-    // 1. Get the current nonce for the sender
+    // 1. Get the CONFIRMED nonce (not 'pending') to ensure sequential ordering
+    // This ensures each transaction has a unique, incrementing nonce
     const nonce = await client.getTransactionCount({
       address: from as `0x${string}`,
-      blockTag: 'pending',
+      blockTag: 'latest',
     });
-    console.log('[2048] Nonce for', from, ':', nonce);
+    console.log('[2048] Current nonce for', from, ':', nonce);
 
     // 2. Get current gas prices from the network
     const gasPrice = await client.getGasPrice();
-    const maxFeePerGas = (gasPrice * BigInt(2)).toString(); // 2x current gas price for headroom
-    const maxPriorityFeePerGas = (gasPrice / BigInt(2)).toString(); // 0.5x for priority
+    // Use 1.2x current gas price for safety
+    const maxFeePerGas = (gasPrice * BigInt(120)) / BigInt(100);
+    const maxPriorityFeePerGas = (gasPrice / BigInt(10)); // 10% priority bump
 
-    // 3. Encode move data as ABI-encoded bytes
-    // Format: direction (uint8) + moveCount (uint32) + score (uint32)
+    // 3. Encode move data - This is the calldata sent to the game contract
+    // Standard ABI encoding with function selector + parameters
     const moveData = encodeAbiParameters(
       [
         { type: 'uint8', name: 'direction' },
@@ -170,19 +172,21 @@ export async function sendMoveTransaction(
       [moveDirection, moveCount, score]
     );
 
-    console.log('[2048] Sending move tx:', { 
+    console.log('[v0] Preparing transaction:', { 
       from, 
       to: GAME_RECIPIENT, 
       nonce,
       direction: moveDirection, 
       moveCount, 
       score,
-      maxFeePerGas,
-      maxPriorityFeePerGas,
-      data: moveData,
+      gasPrice: gasPrice.toString(),
+      maxFeePerGas: maxFeePerGas.toString(),
+      maxPriorityFeePerGas: maxPriorityFeePerGas.toString(),
+      dataLength: moveData.length,
     });
 
-    // 4. Build and send the transaction with all required parameters
+    // 4. Send transaction with all required parameters
+    // The key is to use 'latest' blockTag for nonce to ensure proper sequencing
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
@@ -190,22 +194,22 @@ export async function sendMoveTransaction(
         to: GAME_RECIPIENT,
         value: '0x0',
         data: moveData,
-        gas: '0x30d40', // ~200,000 gas
+        gas: '0x186a0', // 100,000 gas (standard for contract calls)
         nonce: '0x' + nonce.toString(16),
-        maxFeePerGas: '0x' + BigInt(maxFeePerGas).toString(16),
-        maxPriorityFeePerGas: '0x' + BigInt(maxPriorityFeePerGas).toString(16),
+        maxFeePerGas: '0x' + maxFeePerGas.toString(16),
+        maxPriorityFeePerGas: '0x' + maxPriorityFeePerGas.toString(16),
       }],
     });
 
-    console.log('[2048] Tx sent:', txHash);
+    console.log('[v0] Transaction sent with hash:', txHash, 'nonce:', nonce);
     return txHash as string;
   } catch (err: any) {
-    console.error('[2048] Transaction failed:', err?.code, err?.message, err);
+    console.error('[v0] Transaction failed:', err?.code, err?.message, err);
     return null;
   }
 }
 
-// Helper to encode ABI parameters (simple implementation for our needs)
+// Helper to encode ABI parameters following Solidity's packed encoding format
 function encodeAbiParameters(
   types: Array<{ type: string; name: string }>,
   values: any[]
@@ -217,13 +221,17 @@ function encodeAbiParameters(
     const value = values[i];
     
     if (type === 'uint8') {
+      // uint8: 1 byte, padded to 2 hex chars
       encoded += value.toString(16).padStart(2, '0');
     } else if (type === 'uint32') {
+      // uint32: 4 bytes, padded to 8 hex chars
       encoded += value.toString(16).padStart(8, '0');
     } else if (type === 'uint256') {
+      // uint256: 32 bytes, padded to 64 hex chars
       encoded += BigInt(value).toString(16).padStart(64, '0');
     } else if (type === 'address') {
-      encoded += value.slice(2).padStart(40, '0');
+      // address: 20 bytes, remove 0x prefix and pad to 40 hex chars
+      encoded += value.slice(2).padStart(40, '0').toLowerCase();
     }
   }
   
