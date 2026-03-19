@@ -145,16 +145,55 @@ export async function sendMoveTransaction(
   if (!window.ethereum) return null;
 
   try {
-    console.log('[2048] Sending move tx:', { from, to: GAME_RECIPIENT, direction: moveDirection, moveCount, score });
+    const client = getPublicClient();
+    
+    // 1. Get the current nonce for the sender
+    const nonce = await client.getTransactionCount({
+      address: from as `0x${string}`,
+      blockTag: 'pending',
+    });
+    console.log('[2048] Nonce for', from, ':', nonce);
 
-    // Let MetaMask handle gas estimation and fee params automatically.
-    // Only specify from, to, and value — the wallet + Tempo RPC will negotiate the rest.
+    // 2. Get current gas prices from the network
+    const gasPrice = await client.getGasPrice();
+    const maxFeePerGas = (gasPrice * BigInt(2)).toString(); // 2x current gas price for headroom
+    const maxPriorityFeePerGas = (gasPrice / BigInt(2)).toString(); // 0.5x for priority
+
+    // 3. Encode move data as ABI-encoded bytes
+    // Format: direction (uint8) + moveCount (uint32) + score (uint32)
+    const moveData = encodeAbiParameters(
+      [
+        { type: 'uint8', name: 'direction' },
+        { type: 'uint32', name: 'moveCount' },
+        { type: 'uint32', name: 'score' },
+      ],
+      [moveDirection, moveCount, score]
+    );
+
+    console.log('[2048] Sending move tx:', { 
+      from, 
+      to: GAME_RECIPIENT, 
+      nonce,
+      direction: moveDirection, 
+      moveCount, 
+      score,
+      maxFeePerGas,
+      maxPriorityFeePerGas,
+      data: moveData,
+    });
+
+    // 4. Build and send the transaction with all required parameters
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
         from,
         to: GAME_RECIPIENT,
         value: '0x0',
+        data: moveData,
+        gas: '0x30d40', // ~200,000 gas
+        nonce: '0x' + nonce.toString(16),
+        maxFeePerGas: '0x' + BigInt(maxFeePerGas).toString(16),
+        maxPriorityFeePerGas: '0x' + BigInt(maxPriorityFeePerGas).toString(16),
       }],
     });
 
@@ -164,6 +203,31 @@ export async function sendMoveTransaction(
     console.error('[2048] Transaction failed:', err?.code, err?.message, err);
     return null;
   }
+}
+
+// Helper to encode ABI parameters (simple implementation for our needs)
+function encodeAbiParameters(
+  types: Array<{ type: string; name: string }>,
+  values: any[]
+): string {
+  let encoded = '0x';
+  
+  for (let i = 0; i < types.length; i++) {
+    const type = types[i].type;
+    const value = values[i];
+    
+    if (type === 'uint8') {
+      encoded += value.toString(16).padStart(2, '0');
+    } else if (type === 'uint32') {
+      encoded += value.toString(16).padStart(8, '0');
+    } else if (type === 'uint256') {
+      encoded += BigInt(value).toString(16).padStart(64, '0');
+    } else if (type === 'address') {
+      encoded += value.slice(2).padStart(40, '0');
+    }
+  }
+  
+  return encoded;
 }
 
 export async function getGasPrice(): Promise<string> {
