@@ -125,88 +125,41 @@ export async function sendMoveTransaction(
   if (!window.ethereum) return null;
 
   try {
-    // 1. Get the confirmed nonce via direct RPC — ensures unique nonce per tx
-    const nonceHex = await rpcCall('eth_getTransactionCount', [from, 'latest']);
-    const nonce = hexToDecimal(nonceHex);
+    console.log('[tempo] Sending move tx — direction:', moveDirection, 'moveCount:', moveCount, 'score:', score);
 
-    // 2. Get gas price via direct RPC and apply 1.2x multiplier
-    const gasPriceHex = await rpcCall('eth_gasPrice', []);
-    const gasPrice = hexToBigInt(gasPriceHex);
-    const maxFeePerGas = (gasPrice * BigInt(120)) / BigInt(100);
-    const maxPriorityFeePerGas = gasPrice / BigInt(10);
-
-    // 3. Encode move data as packed bytes (direction + moveCount + score)
-    const moveData = encodeMoveData(moveDirection, moveCount, score);
-
-    console.log('[v0] Sending tx — nonce:', nonce, 'direction:', moveDirection, 'moveCount:', moveCount, 'score:', score);
-
-    // 4. Send transaction via MetaMask with all required EIP-1559 fields
+    // Simple value transfer matching Tempo SDK pattern:
+    // AddCall(recipient, big.NewInt(0), []byte{})
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
         from,
         to: GAME_RECIPIENT,
         value: '0x0',
-        data: moveData,
-        gas: '0x186a0', // 100,000 gas
-        nonce: '0x' + nonce.toString(16),
-        maxFeePerGas: '0x' + maxFeePerGas.toString(16),
-        maxPriorityFeePerGas: '0x' + maxPriorityFeePerGas.toString(16),
       }],
     });
 
-    console.log('[v0] Tx hash:', txHash, '| nonce used:', nonce);
+    console.log('[tempo] Tx hash:', txHash);
     return txHash as string;
   } catch (err: any) {
-    console.error('[v0] Transaction failed:', err?.code, err?.message);
+    console.error('[tempo] Transaction failed:', err?.code, err?.message);
     return null;
   }
 }
 
-// Helper to encode ABI parameters following Solidity's packed encoding format
-function encodeAbiParameters(
-  types: Array<{ type: string; name: string }>,
-  values: any[]
-): string {
-  let encoded = '0x';
-  
-  for (let i = 0; i < types.length; i++) {
-    const type = types[i].type;
-    const value = values[i];
-    
-    if (type === 'uint8') {
-      // uint8: 1 byte, padded to 2 hex chars
-      encoded += value.toString(16).padStart(2, '0');
-    } else if (type === 'uint32') {
-      // uint32: 4 bytes, padded to 8 hex chars
-      encoded += value.toString(16).padStart(8, '0');
-    } else if (type === 'uint256') {
-      // uint256: 32 bytes, padded to 64 hex chars
-      encoded += BigInt(value).toString(16).padStart(64, '0');
-    } else if (type === 'address') {
-      // address: 20 bytes, remove 0x prefix and pad to 40 hex chars
-      encoded += value.slice(2).padStart(40, '0').toLowerCase();
-    }
-  }
-  
-  return encoded;
-}
-
 export async function getGasPrice(): Promise<string> {
-  const client = getPublicClient();
   try {
-    const gasPrice = await client.getGasPrice();
-    return parseFloat(formatEther(gasPrice * BigInt(1e9))).toFixed(6);
+    const gasPrice = await rpcCall('eth_gasPrice', []);
+    const gasPriceBig = hexToBigInt(gasPrice);
+    return (Number(gasPriceBig) / 1e9).toFixed(6);
   } catch {
     return '0.000000';
   }
 }
 
 export async function getBlockNumber(): Promise<number> {
-  const client = getPublicClient();
   try {
-    const block = await client.getBlockNumber();
-    return Number(block);
+    const result = await rpcCall('eth_blockNumber', []);
+    return hexToDecimal(result);
   } catch {
     return 0;
   }
