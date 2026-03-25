@@ -42,10 +42,13 @@ const Index = () => {
 
       if (wallet.address) {
         setPendingTx(true);
+        console.log('[v0] Initiating transaction with address:', wallet.address);
         sendMoveTransaction(wallet.address, directionToNumber(direction), result.moveCount, result.score)
           .then(hash => {
+            console.log('[v0] Transaction response received:', hash);
             setPendingTx(false);
             if (hash) {
+              console.log('[v0] Transaction sent, hash:', hash);
               const txRecord: TxRecord = {
                 hash,
                 direction,
@@ -62,12 +65,18 @@ const Index = () => {
                 );
               }, 3000);
             } else {
-              toast.error('Transaction rejected or failed');
+              console.error('[v0] Transaction rejected - hash is null');
+              toast.error('Transaction rejected or failed', {
+                description: 'Check your wallet for details',
+              });
             }
           })
-          .catch(() => {
+          .catch((err) => {
+            console.error('[v0] Transaction error caught:', err);
             setPendingTx(false);
-            toast.error('Transaction failed');
+            toast.error('Transaction failed', {
+              description: err?.message || 'Unknown error',
+            });
           });
       }
 

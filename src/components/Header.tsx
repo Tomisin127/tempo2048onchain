@@ -10,7 +10,8 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ score, bestScore, onNewGame }) => {
   const { address, balance, usdcBalance, usdceBalance, connected, connecting, connect, disconnect, chainCorrect, hasFees } = useWallet();
 
-  const totalStable = (parseFloat(balance) + parseFloat(usdcBalance) + parseFloat(usdceBalance)).toFixed(4);
+  // All balances are in USD equivalent (balance is native USD, USDC and USDC.e are 1:1 with USD)
+  const totalStable = (parseFloat(balance) + parseFloat(usdcBalance) + parseFloat(usdceBalance)).toFixed(2);
 
   return (
     <header className="flex flex-col gap-3 mb-4 sm:mb-6">
