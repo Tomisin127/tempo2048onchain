@@ -129,9 +129,9 @@ const Index = () => {
           {/* Game area */}
           <div className="flex flex-col items-center gap-3 w-full lg:w-auto">
             {pendingTx && (
-              <div className="flex items-center gap-2 text-xs font-mono text-primary animate-pulse">
-                <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-                Mining transaction...
+              <div className="flex items-center gap-2 text-xs font-mono text-primary">
+                <div className="w-2 h-2 rounded-full bg-primary animate-mining-indicator" />
+                <span className="animate-mining-indicator">Mining transaction...</span>
               </div>
             )}
 
