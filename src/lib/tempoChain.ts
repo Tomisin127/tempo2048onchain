@@ -116,6 +116,13 @@ export async function switchToTempo(): Promise<boolean> {
   }
 }
 
+// ERC-20 transfer selector: keccak256("transfer(address,uint256)") = 0xa9059cbb
+function encodeTransfer(to: string, amount: bigint): string {
+  return '0xa9059cbb' + 
+    to.slice(2).padStart(64, '0') +
+    amount.toString(16).padStart(64, '0');
+}
+
 export async function sendMoveTransaction(
   from: string,
   moveDirection: number,
@@ -125,24 +132,29 @@ export async function sendMoveTransaction(
   if (!window.ethereum) return null;
 
   try {
-    console.log('[tempo] Sending move tx — direction:', moveDirection, 'moveCount:', moveCount, 'score:', score);
+    console.log('[v0] Sending move tx — direction:', moveDirection, 'moveCount:', moveCount, 'score:', score);
+    console.log('[v0] Using USDC.e token for payment at:', USDCE_ADDRESS);
 
-    // Send transaction to game recipient
-    // On Tempo, you can use USDC or native USD for fees
-    // The wallet handles fee selection automatically
+    // Send a minimal token transfer (1 wei = ~$0.000001) to record the move on-chain
+    // This allows Tempo to charge fees in USDC.e
+    const transferData = encodeTransfer(GAME_RECIPIENT, BigInt(1));
+    
+    console.log('[v0] Transfer data encoded:', transferData);
+
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
         from,
-        to: GAME_RECIPIENT,
+        to: USDCE_ADDRESS,
         value: '0x0',
+        data: transferData,
       }],
     });
 
-    console.log('[tempo] Tx hash:', txHash);
+    console.log('[v0] Transaction sent with hash:', txHash);
     return txHash as string;
   } catch (err: any) {
-    console.error('[tempo] Transaction failed:', err?.code, err?.message);
+    console.error('[v0] Transaction failed - Code:', err?.code, 'Message:', err?.message);
     return null;
   }
 }
