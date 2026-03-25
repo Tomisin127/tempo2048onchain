@@ -5,11 +5,16 @@ interface PrivyProviderProps {
   children: React.ReactNode;
 }
 
-// Always mount Privy so usePrivy() never throws "must be within PrivyProvider".
-// The app ID falls back to a placeholder — Privy will reject auth but the app loads fine.
-const APP_ID = import.meta.env.VITE_PRIVY_APP_ID || 'clqk5v2wo0036jz0fqbqvpumk';
+// Your actual Privy App ID
+const APP_ID = import.meta.env.VITE_PRIVY_APP_ID;
 
 export const PrivyProvider: React.FC<PrivyProviderProps> = ({ children }) => {
+  // If no app ID, don't wrap with Privy - components will handle missing Privy gracefully
+  if (!APP_ID) {
+    console.log('[v0] VITE_PRIVY_APP_ID not set - Privy features disabled');
+    return <>{children}</>;
+  }
+
   return (
     <PrivyProviderBase
       appId={APP_ID}

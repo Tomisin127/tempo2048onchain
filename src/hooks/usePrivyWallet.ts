@@ -2,12 +2,14 @@ import { usePrivy } from '@privy-io/react-auth';
 import { useState, useEffect, useCallback } from 'react';
 import { getBalance, getUSDCBalance, getUSDCeBalance, switchToTempo } from '@/lib/tempoChain';
 
-interface PrivyWalletInfo {
+export interface PrivyWalletInfo {
   address: string | null;
   balance: string;
   usdcBalance: string;
   usdceBalance: string;
   hasFees: boolean;
+  login: () => Promise<void>;
+  logout: () => Promise<void>;
 }
 
 const EMPTY_STATE: PrivyWalletInfo = {
@@ -16,16 +18,28 @@ const EMPTY_STATE: PrivyWalletInfo = {
   usdcBalance: '0.00',
   usdceBalance: '0.00',
   hasFees: false,
+  login: async () => {},
+  logout: async () => {},
 };
 
-export function usePrivyWallet() {
-  const { user, login, logout } = usePrivy();
-  const [walletInfo, setWalletInfo] = useState<PrivyWalletInfo>(EMPTY_STATE);
+export function usePrivyWallet(): PrivyWalletInfo {
+  // Check if we have a Privy App ID - if not, return empty state
+  const hasPrivyAppId = !!import.meta.env.VITE_PRIVY_APP_ID;
+  
+  // Only call usePrivy if we have an app ID
+  // Otherwise just return empty state to avoid "usePrivy must be within PrivyProvider" error
+  if (!hasPrivyAppId) {
+    return EMPTY_STATE;
+  }
+
+  const { user, login, logout, isReady } = usePrivy();
+  const [wallet, setWallet] = useState<PrivyWalletInfo>(EMPTY_STATE);
 
   const computeHasFees = (a: string, b: string, c: string) =>
     parseFloat(a) + parseFloat(b) + parseFloat(c) >= 0.01;
 
   const handleLogin = useCallback(async () => {
+    if (!login) return;
     try {
       await login({
         onComplete: async (u: any) => {
@@ -34,41 +48,70 @@ export function usePrivyWallet() {
           try {
             await switchToTempo();
             const [bal, usdcBal, usdceBal] = await Promise.all([
-              getBalance(addr), getUSDCBalance(addr), getUSDCeBalance(addr),
+              getBalance(addr),
+              getUSDCBalance(addr),
+              getUSDCeBalance(addr),
             ]);
-            setWalletInfo({ address: addr, balance: bal, usdcBalance: usdcBal, usdceBalance: usdceBal, hasFees: computeHasFees(bal, usdcBal, usdceBal) });
+            setWallet({
+              address: addr,
+              balance: bal,
+              usdcBalance: usdcBal,
+              usdceBalance: usdceBal,
+              hasFees: computeHasFees(bal, usdcBal, usdceBal),
+              login: handleLogin,
+              logout: handleLogout,
+            });
           } catch (err) {
-            console.error('[v0] Privy wallet setup error:', err);
+            console.error('[v0] Setup:', err);
           }
         },
       });
     } catch (err) {
-      console.error('[v0] Privy login error:', err);
+      console.error('[v0] Login:', err);
     }
   }, [login]);
 
   const handleLogout = useCallback(async () => {
-    try { await logout(); } catch { /* ignore */ }
-    setWalletInfo(EMPTY_STATE);
+    if (!logout) return;
+    try {
+      await logout();
+    } catch (err) {
+      console.error('[v0] Logout:', err);
+    }
+    setWallet(EMPTY_STATE);
   }, [logout]);
 
   useEffect(() => {
     const addr = user?.wallet?.address;
-    if (addr && !walletInfo.address) {
+    if (addr && !wallet.address && isReady) {
       (async () => {
         try {
           const [bal, usdcBal, usdceBal] = await Promise.all([
-            getBalance(addr), getUSDCBalance(addr), getUSDCeBalance(addr),
+            getBalance(addr),
+            getUSDCBalance(addr),
+            getUSDCeBalance(addr),
           ]);
-          setWalletInfo({ address: addr, balance: bal, usdcBalance: usdcBal, usdceBalance: usdceBal, hasFees: computeHasFees(bal, usdcBal, usdceBal) });
+          setWallet({
+            address: addr,
+            balance: bal,
+            usdcBalance: usdcBal,
+            usdceBalance: usdceBal,
+            hasFees: computeHasFees(bal, usdcBal, usdceBal),
+            login: handleLogin,
+            logout: handleLogout,
+          });
         } catch (err) {
-          console.error('[v0] Privy balance fetch error:', err);
+          console.error('[v0] Balance:', err);
         }
       })();
-    } else if (!addr && walletInfo.address) {
-      setWalletInfo(EMPTY_STATE);
+    } else if (!addr && wallet.address && isReady) {
+      setWallet(EMPTY_STATE);
     }
-  }, [user?.wallet?.address, walletInfo.address]);
+  }, [user?.wallet?.address, wallet.address, isReady, handleLogin, handleLogout]);
 
-  return { ...walletInfo, login: handleLogin, logout: handleLogout };
+  return {
+    ...wallet,
+    login: handleLogin,
+    logout: handleLogout,
+  };
 }
