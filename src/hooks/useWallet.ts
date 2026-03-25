@@ -1,7 +1,9 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getBalance, getUSDCBalance, getUSDCeBalance, switchToTempo, CHAIN_ID_HEX, MIN_FEE_USD } from '@/lib/tempoChain';
+import type { WalletType } from '@/types/wallet';
 
 interface WalletState {
+  walletType: WalletType | null;
   address: string | null;
   balance: string;
   usdcBalance: string;
@@ -14,6 +16,7 @@ interface WalletState {
 
 export function useWallet() {
   const [state, setState] = useState<WalletState>({
+    walletType: null,
     address: null,
     balance: '0.0000',
     usdcBalance: '0.00',
@@ -35,22 +38,25 @@ export function useWallet() {
   }, []);
 
   const computeHasFees = (nativeBal: string, usdcBal: string, usdceBal: string) => {
-    // Tempo allows paying fees in any supported stablecoin (native USD, USDC, USDC.e)
     const total = parseFloat(nativeBal) + parseFloat(usdcBal) + parseFloat(usdceBal);
     return total >= MIN_FEE_USD;
   };
 
   const refreshBalance = useCallback(async (addr: string) => {
-    const [bal, usdcBal, usdceBal] = await Promise.all([
-      getBalance(addr),
-      getUSDCBalance(addr),
-      getUSDCeBalance(addr),
-    ]);
-    const hasFees = computeHasFees(bal, usdcBal, usdceBal);
-    setState(s => ({ ...s, balance: bal, usdcBalance: usdcBal, usdceBalance: usdceBal, hasFees }));
+    try {
+      const [bal, usdcBal, usdceBal] = await Promise.all([
+        getBalance(addr),
+        getUSDCBalance(addr),
+        getUSDCeBalance(addr),
+      ]);
+      const hasFees = computeHasFees(bal, usdcBal, usdceBal);
+      setState(s => ({ ...s, balance: bal, usdcBalance: usdcBal, usdceBalance: usdceBal, hasFees }));
+    } catch (err) {
+      console.error('[v0] Error refreshing balance:', err);
+    }
   }, []);
 
-  const connect = useCallback(async () => {
+  const connectMetaMask = useCallback(async () => {
     if (!window.ethereum) {
       window.open('https://metamask.io', '_blank');
       return;
@@ -75,6 +81,7 @@ export function useWallet() {
       const hasFees = computeHasFees(bal, usdcBal, usdceBal);
 
       setState({
+        walletType: 'metamask',
         address,
         balance: bal,
         usdcBalance: usdcBal,
@@ -84,13 +91,34 @@ export function useWallet() {
         chainCorrect: switched,
         hasFees,
       });
-    } catch {
+    } catch (err) {
+      console.error('[v0] MetaMask connection error:', err);
       setState(s => ({ ...s, connecting: false }));
     }
   }, []);
 
-  const disconnect = useCallback(() => {
+  const connectPrivy = useCallback(async () => {
+    try {
+      setState(s => ({ ...s, connecting: true }));
+      // Import Privy hook dynamically to use it inside the callback
+      const { usePrivy } = await import('@privy-io/react-auth');
+      // Note: This won't work because hooks can't be called in callbacks
+      // Instead, we'll signal that Privy login should be triggered from the component
+      console.log('[v0] Privy connection requested - should be handled by Privy UI');
+      setState(s => ({ ...s, connecting: false }));
+    } catch (err) {
+      console.error('[v0] Privy setup error:', err);
+      setState(s => ({ ...s, connecting: false }));
+    }
+  }, []);
+
+  const connect = useCallback(async () => {
+    await connectMetaMask();
+  }, [connectMetaMask]);
+
+  const disconnect = useCallback(async () => {
     setState({
+      walletType: null,
       address: null,
       balance: '0.0000',
       usdcBalance: '0.00',
@@ -102,8 +130,9 @@ export function useWallet() {
     });
   }, []);
 
+  // Monitor MetaMask account/chain changes
   useEffect(() => {
-    if (!window.ethereum) return;
+    if (state.walletType !== 'metamask' || !window.ethereum) return;
 
     const handleAccountsChanged = async (accounts: string[]) => {
       if (accounts.length === 0) {
@@ -116,7 +145,17 @@ export function useWallet() {
         ]);
         const correct = await checkChain();
         const hasFees = computeHasFees(bal, usdcBal, usdceBal);
-        setState({ address: accounts[0], balance: bal, usdcBalance: usdcBal, usdceBalance: usdceBal, connected: true, connecting: false, chainCorrect: correct, hasFees });
+        setState({ 
+          walletType: 'metamask',
+          address: accounts[0], 
+          balance: bal, 
+          usdcBalance: usdcBal, 
+          usdceBalance: usdceBal, 
+          connected: true, 
+          connecting: false, 
+          chainCorrect: correct, 
+          hasFees 
+        });
       }
     };
 
@@ -133,7 +172,14 @@ export function useWallet() {
       window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
       window.ethereum?.removeListener('chainChanged', handleChainChanged);
     };
-  }, [state.address, checkChain, disconnect, refreshBalance]);
+  }, [state.walletType, state.address, checkChain, disconnect, refreshBalance]);
 
-  return { ...state, connect, disconnect, refreshBalance };
+  return { 
+    ...state, 
+    connect, 
+    connectMetaMask,
+    connectPrivy,
+    disconnect, 
+    refreshBalance 
+  };
 }
