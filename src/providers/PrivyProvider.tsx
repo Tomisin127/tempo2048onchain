@@ -21,24 +21,7 @@ export const PrivyProvider: React.FC<PrivyProviderProps> = ({ children }) => {
         embeddedWallets: {
           createOnLogin: 'users-without-wallets',
         },
-        defaultChain: {
-          chainId: 4217,
-          chainName: 'Tempo Mainnet',
-        },
-        networks: [
-          {
-            chainId: 4217,
-            name: 'Tempo Mainnet',
-            rpcUrl: 'https://rpc.tempo.xyz',
-            chainName: 'Tempo Mainnet',
-            nativeCurrency: {
-              name: 'USD',
-              symbol: 'USD',
-              decimals: 18,
-            },
-          },
-        ],
-      }}
+      } as any}
     >
       {children}
     </PrivyProviderBase>
