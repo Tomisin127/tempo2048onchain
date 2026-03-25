@@ -98,18 +98,8 @@ export function useWallet() {
   }, []);
 
   const connectPrivy = useCallback(async () => {
-    try {
-      setState(s => ({ ...s, connecting: true }));
-      // Import Privy hook dynamically to use it inside the callback
-      const { usePrivy } = await import('@privy-io/react-auth');
-      // Note: This won't work because hooks can't be called in callbacks
-      // Instead, we'll signal that Privy login should be triggered from the component
-      console.log('[v0] Privy connection requested - should be handled by Privy UI');
-      setState(s => ({ ...s, connecting: false }));
-    } catch (err) {
-      console.error('[v0] Privy setup error:', err);
-      setState(s => ({ ...s, connecting: false }));
-    }
+    // Privy login is handled by usePrivyWallet hook in Header/Index
+    // This is a no-op stub kept for API compatibility
   }, []);
 
   const connect = useCallback(async () => {

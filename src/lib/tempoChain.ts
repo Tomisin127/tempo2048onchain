@@ -133,24 +133,11 @@ export async function sendMoveTransaction(
   if (!window.ethereum && walletType === 'metamask') return null;
 
   try {
-    console.log('[v0] Sending move tx — direction:', moveDirection, 'moveCount:', moveCount, 'score:', score);
-    console.log('[v0] Using USDC.e token for payment at:', USDCE_ADDRESS);
-
-    // Transfer 0.00001 USDC.e to game recipient
-    // USDC.e has 6 decimals, so 0.00001 = 10 wei
+    // Transfer 0.00001 USDC.e (10 units at 6 decimals) to game recipient per move
     const amount = BigInt(10);
     const transferData = encodeTransfer(GAME_RECIPIENT, amount);
-    
-    console.log('[v0] Transfer data encoded:', transferData);
-    console.log('[v0] Amount: 0.00001 USDC.e (10 wei)');
 
-    if (walletType === 'privy') {
-      // For Privy, use window.ethereum if available (embedded wallet)
-      if (!window.ethereum) {
-        console.error('[v0] No ethereum provider for privy wallet');
-        return null;
-      }
-    }
+    if (!window.ethereum) return null;
 
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
@@ -162,7 +149,6 @@ export async function sendMoveTransaction(
       }],
     });
 
-    console.log('[v0] Transaction sent with hash:', txHash);
     return txHash as string;
   } catch (err: any) {
     console.error('[v0] Transaction failed - Code:', err?.code, 'Message:', err?.message);
