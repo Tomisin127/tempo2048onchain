@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getBalance, getUSDCBalance, getUSDCeBalance, switchToTempo, CHAIN_ID_HEX, MIN_FEE_USD } from '@/lib/tempoChain';
-import { usePrivy } from '@privy-io/react-auth';
 import type { WalletType } from '@/types/wallet';
 
 interface WalletState {
@@ -16,7 +15,6 @@ interface WalletState {
 }
 
 export function useWallet() {
-  const { user, login, logout, linkWallet } = usePrivy();
   const [state, setState] = useState<WalletState>({
     walletType: null,
     address: null,
@@ -102,59 +100,23 @@ export function useWallet() {
   const connectPrivy = useCallback(async () => {
     try {
       setState(s => ({ ...s, connecting: true }));
-      await login({
-        onComplete: async (user) => {
-          if (user?.wallet?.address) {
-            try {
-              // Ensure Privy's embedded wallet is connected
-              const embeddedWallet = user.linkedAccounts?.find(
-                acc => 'walletClientType' in acc && acc.walletClientType === 'privy'
-              );
-              
-              if (embeddedWallet && 'address' in embeddedWallet) {
-                const address = embeddedWallet.address;
-                const switched = await switchToTempo();
-                const [bal, usdcBal, usdceBal] = await Promise.all([
-                  getBalance(address),
-                  getUSDCBalance(address),
-                  getUSDCeBalance(address),
-                ]);
-                const hasFees = computeHasFees(bal, usdcBal, usdceBal);
-
-                setState({
-                  walletType: 'privy',
-                  address,
-                  balance: bal,
-                  usdcBalance: usdcBal,
-                  usdceBalance: usdceBal,
-                  connected: true,
-                  connecting: false,
-                  chainCorrect: switched,
-                  hasFees,
-                });
-              }
-            } catch (err) {
-              console.error('[v0] Error setting up privy wallet:', err);
-              setState(s => ({ ...s, connecting: false }));
-            }
-          }
-        },
-      });
+      // Import Privy hook dynamically to use it inside the callback
+      const { usePrivy } = await import('@privy-io/react-auth');
+      // Note: This won't work because hooks can't be called in callbacks
+      // Instead, we'll signal that Privy login should be triggered from the component
+      console.log('[v0] Privy connection requested - should be handled by Privy UI');
+      setState(s => ({ ...s, connecting: false }));
     } catch (err) {
-      console.error('[v0] Privy login error:', err);
+      console.error('[v0] Privy setup error:', err);
       setState(s => ({ ...s, connecting: false }));
     }
-  }, [login]);
+  }, []);
 
   const connect = useCallback(async () => {
-    // Default to MetaMask for now
     await connectMetaMask();
   }, [connectMetaMask]);
 
   const disconnect = useCallback(async () => {
-    if (state.walletType === 'privy') {
-      await logout();
-    }
     setState({
       walletType: null,
       address: null,
@@ -166,15 +128,7 @@ export function useWallet() {
       chainCorrect: false,
       hasFees: false,
     });
-  }, [state.walletType, logout]);
-
-  // Monitor Privy user login
-  useEffect(() => {
-    if (user?.wallet?.address && !state.connected) {
-      // Auto-connect if Privy user exists
-      connectPrivy();
-    }
-  }, [user?.wallet?.address, state.connected, connectPrivy]);
+  }, []);
 
   // Monitor MetaMask account/chain changes
   useEffect(() => {

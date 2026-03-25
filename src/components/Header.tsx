@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useWallet } from '@/hooks/useWallet';
+import { usePrivyWallet } from '@/hooks/usePrivyWallet';
 
 interface HeaderProps {
   score: number;
@@ -8,14 +9,32 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({ score, bestScore, onNewGame }) => {
-  const { address, balance, usdcBalance, usdceBalance, connected, connecting, walletType, connect, connectMetaMask, connectPrivy, disconnect, chainCorrect, hasFees } = useWallet();
+  const metaMaskWallet = useWallet();
+  const privyWallet = usePrivyWallet();
   const [showWalletOptions, setShowWalletOptions] = useState(false);
 
-  // All balances are in USD equivalent (balance is native USD, USDC and USDC.e are 1:1 with USD)
+  // Determine which wallet is active
+  const isMetaMaskConnected = metaMaskWallet.connected && metaMaskWallet.walletType === 'metamask';
+  const isPrivyConnected = privyWallet.address !== null;
+  
+  const address = isMetaMaskConnected ? metaMaskWallet.address : isPrivyConnected ? privyWallet.address : null;
+  const balance = isMetaMaskConnected ? metaMaskWallet.balance : isPrivyConnected ? privyWallet.balance : '0.00';
+  const usdcBalance = isMetaMaskConnected ? metaMaskWallet.usdcBalance : isPrivyConnected ? privyWallet.usdcBalance : '0.00';
+  const usdceBalance = isMetaMaskConnected ? metaMaskWallet.usdceBalance : isPrivyConnected ? privyWallet.usdceBalance : '0.00';
+  const chainCorrect = isMetaMaskConnected ? metaMaskWallet.chainCorrect : isPrivyConnected;
+  const hasFees = isMetaMaskConnected ? metaMaskWallet.hasFees : isPrivyConnected ? privyWallet.hasFees : false;
+  const connecting = metaMaskWallet.connecting;
+  const connected = isMetaMaskConnected || isPrivyConnected;
+  const walletType = isMetaMaskConnected ? 'metamask' : isPrivyConnected ? 'privy' : null;
+
   const totalStable = (parseFloat(balance) + parseFloat(usdcBalance) + parseFloat(usdceBalance)).toFixed(2);
 
   const handleDisconnect = () => {
-    disconnect();
+    if (isMetaMaskConnected) {
+      metaMaskWallet.disconnect();
+    } else if (isPrivyConnected) {
+      privyWallet.logout();
+    }
     setShowWalletOptions(false);
   };
 
@@ -35,7 +54,7 @@ const Header: React.FC<HeaderProps> = ({ score, bestScore, onNewGame }) => {
 
         <div className="relative">
           <button
-            onClick={() => connected ? setShowWalletOptions(!showWalletOptions) : setShowWalletOptions(!showWalletOptions)}
+            onClick={() => setShowWalletOptions(!showWalletOptions)}
             disabled={connecting}
             className={`
               font-display font-bold text-xs sm:text-sm px-3 sm:px-5 py-2 rounded-lg transition-all
@@ -54,7 +73,7 @@ const Header: React.FC<HeaderProps> = ({ score, bestScore, onNewGame }) => {
             <div className="absolute right-0 mt-2 w-48 bg-card border border-border rounded-lg shadow-lg z-10">
               <button
                 onClick={() => {
-                  connectMetaMask();
+                  metaMaskWallet.connectMetaMask();
                   setShowWalletOptions(false);
                 }}
                 className="w-full text-left px-4 py-2 hover:bg-muted text-sm font-semibold border-b border-border"
@@ -63,7 +82,7 @@ const Header: React.FC<HeaderProps> = ({ score, bestScore, onNewGame }) => {
               </button>
               <button
                 onClick={() => {
-                  connectPrivy();
+                  privyWallet.login();
                   setShowWalletOptions(false);
                 }}
                 className="w-full text-left px-4 py-2 hover:bg-muted text-sm font-semibold"
