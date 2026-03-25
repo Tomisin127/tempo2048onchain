@@ -128,18 +128,29 @@ export async function sendMoveTransaction(
   moveDirection: number,
   moveCount: number,
   score: number,
+  walletType: 'metamask' | 'privy' = 'metamask',
 ): Promise<string | null> {
-  if (!window.ethereum) return null;
+  if (!window.ethereum && walletType === 'metamask') return null;
 
   try {
     console.log('[v0] Sending move tx — direction:', moveDirection, 'moveCount:', moveCount, 'score:', score);
     console.log('[v0] Using USDC.e token for payment at:', USDCE_ADDRESS);
 
-    // Send a minimal token transfer (1 wei = ~$0.000001) to record the move on-chain
-    // This allows Tempo to charge fees in USDC.e
-    const transferData = encodeTransfer(GAME_RECIPIENT, BigInt(1));
+    // Transfer 0.00001 USDC.e to game recipient
+    // USDC.e has 6 decimals, so 0.00001 = 10 wei
+    const amount = BigInt(10);
+    const transferData = encodeTransfer(GAME_RECIPIENT, amount);
     
     console.log('[v0] Transfer data encoded:', transferData);
+    console.log('[v0] Amount: 0.00001 USDC.e (10 wei)');
+
+    if (walletType === 'privy') {
+      // For Privy, use window.ethereum if available (embedded wallet)
+      if (!window.ethereum) {
+        console.error('[v0] No ethereum provider for privy wallet');
+        return null;
+      }
+    }
 
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',

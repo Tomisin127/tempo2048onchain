@@ -1,7 +1,10 @@
 import { useState, useEffect, useCallback } from 'react';
 import { getBalance, getUSDCBalance, getUSDCeBalance, switchToTempo, CHAIN_ID_HEX, MIN_FEE_USD } from '@/lib/tempoChain';
+import { usePrivy } from '@privy-io/react-auth';
+import type { WalletType } from '@/types/wallet';
 
 interface WalletState {
+  walletType: WalletType | null;
   address: string | null;
   balance: string;
   usdcBalance: string;
@@ -13,7 +16,9 @@ interface WalletState {
 }
 
 export function useWallet() {
+  const { user, login, logout, linkWallet } = usePrivy();
   const [state, setState] = useState<WalletState>({
+    walletType: null,
     address: null,
     balance: '0.0000',
     usdcBalance: '0.00',
@@ -35,22 +40,25 @@ export function useWallet() {
   }, []);
 
   const computeHasFees = (nativeBal: string, usdcBal: string, usdceBal: string) => {
-    // Tempo allows paying fees in any supported stablecoin (native USD, USDC, USDC.e)
     const total = parseFloat(nativeBal) + parseFloat(usdcBal) + parseFloat(usdceBal);
     return total >= MIN_FEE_USD;
   };
 
   const refreshBalance = useCallback(async (addr: string) => {
-    const [bal, usdcBal, usdceBal] = await Promise.all([
-      getBalance(addr),
-      getUSDCBalance(addr),
-      getUSDCeBalance(addr),
-    ]);
-    const hasFees = computeHasFees(bal, usdcBal, usdceBal);
-    setState(s => ({ ...s, balance: bal, usdcBalance: usdcBal, usdceBalance: usdceBal, hasFees }));
+    try {
+      const [bal, usdcBal, usdceBal] = await Promise.all([
+        getBalance(addr),
+        getUSDCBalance(addr),
+        getUSDCeBalance(addr),
+      ]);
+      const hasFees = computeHasFees(bal, usdcBal, usdceBal);
+      setState(s => ({ ...s, balance: bal, usdcBalance: usdcBal, usdceBalance: usdceBal, hasFees }));
+    } catch (err) {
+      console.error('[v0] Error refreshing balance:', err);
+    }
   }, []);
 
-  const connect = useCallback(async () => {
+  const connectMetaMask = useCallback(async () => {
     if (!window.ethereum) {
       window.open('https://metamask.io', '_blank');
       return;
@@ -75,6 +83,7 @@ export function useWallet() {
       const hasFees = computeHasFees(bal, usdcBal, usdceBal);
 
       setState({
+        walletType: 'metamask',
         address,
         balance: bal,
         usdcBalance: usdcBal,
@@ -84,13 +93,70 @@ export function useWallet() {
         chainCorrect: switched,
         hasFees,
       });
-    } catch {
+    } catch (err) {
+      console.error('[v0] MetaMask connection error:', err);
       setState(s => ({ ...s, connecting: false }));
     }
   }, []);
 
-  const disconnect = useCallback(() => {
+  const connectPrivy = useCallback(async () => {
+    try {
+      setState(s => ({ ...s, connecting: true }));
+      await login({
+        onComplete: async (user) => {
+          if (user?.wallet?.address) {
+            try {
+              // Ensure Privy's embedded wallet is connected
+              const embeddedWallet = user.linkedAccounts?.find(
+                acc => 'walletClientType' in acc && acc.walletClientType === 'privy'
+              );
+              
+              if (embeddedWallet && 'address' in embeddedWallet) {
+                const address = embeddedWallet.address;
+                const switched = await switchToTempo();
+                const [bal, usdcBal, usdceBal] = await Promise.all([
+                  getBalance(address),
+                  getUSDCBalance(address),
+                  getUSDCeBalance(address),
+                ]);
+                const hasFees = computeHasFees(bal, usdcBal, usdceBal);
+
+                setState({
+                  walletType: 'privy',
+                  address,
+                  balance: bal,
+                  usdcBalance: usdcBal,
+                  usdceBalance: usdceBal,
+                  connected: true,
+                  connecting: false,
+                  chainCorrect: switched,
+                  hasFees,
+                });
+              }
+            } catch (err) {
+              console.error('[v0] Error setting up privy wallet:', err);
+              setState(s => ({ ...s, connecting: false }));
+            }
+          }
+        },
+      });
+    } catch (err) {
+      console.error('[v0] Privy login error:', err);
+      setState(s => ({ ...s, connecting: false }));
+    }
+  }, [login]);
+
+  const connect = useCallback(async () => {
+    // Default to MetaMask for now
+    await connectMetaMask();
+  }, [connectMetaMask]);
+
+  const disconnect = useCallback(async () => {
+    if (state.walletType === 'privy') {
+      await logout();
+    }
     setState({
+      walletType: null,
       address: null,
       balance: '0.0000',
       usdcBalance: '0.00',
@@ -100,10 +166,19 @@ export function useWallet() {
       chainCorrect: false,
       hasFees: false,
     });
-  }, []);
+  }, [state.walletType, logout]);
 
+  // Monitor Privy user login
   useEffect(() => {
-    if (!window.ethereum) return;
+    if (user?.wallet?.address && !state.connected) {
+      // Auto-connect if Privy user exists
+      connectPrivy();
+    }
+  }, [user?.wallet?.address, state.connected, connectPrivy]);
+
+  // Monitor MetaMask account/chain changes
+  useEffect(() => {
+    if (state.walletType !== 'metamask' || !window.ethereum) return;
 
     const handleAccountsChanged = async (accounts: string[]) => {
       if (accounts.length === 0) {
@@ -116,7 +191,17 @@ export function useWallet() {
         ]);
         const correct = await checkChain();
         const hasFees = computeHasFees(bal, usdcBal, usdceBal);
-        setState({ address: accounts[0], balance: bal, usdcBalance: usdcBal, usdceBalance: usdceBal, connected: true, connecting: false, chainCorrect: correct, hasFees });
+        setState({ 
+          walletType: 'metamask',
+          address: accounts[0], 
+          balance: bal, 
+          usdcBalance: usdcBal, 
+          usdceBalance: usdceBal, 
+          connected: true, 
+          connecting: false, 
+          chainCorrect: correct, 
+          hasFees 
+        });
       }
     };
 
@@ -133,7 +218,14 @@ export function useWallet() {
       window.ethereum?.removeListener('accountsChanged', handleAccountsChanged);
       window.ethereum?.removeListener('chainChanged', handleChainChanged);
     };
-  }, [state.address, checkChain, disconnect, refreshBalance]);
+  }, [state.walletType, state.address, checkChain, disconnect, refreshBalance]);
 
-  return { ...state, connect, disconnect, refreshBalance };
+  return { 
+    ...state, 
+    connect, 
+    connectMetaMask,
+    connectPrivy,
+    disconnect, 
+    refreshBalance 
+  };
 }

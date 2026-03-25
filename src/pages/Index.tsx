@@ -41,12 +41,14 @@ const Index = () => {
       if (!result) return prev;
 
       if (wallet.address) {
-        setPendingTx(true);
-        console.log('[v0] Initiating transaction with address:', wallet.address);
-        sendMoveTransaction(wallet.address, directionToNumber(direction), result.moveCount, result.score)
+        const isSilent = wallet.walletType === 'privy';
+        if (!isSilent) setPendingTx(true);
+        
+        console.log('[v0] Initiating transaction with address:', wallet.address, 'wallet type:', wallet.walletType);
+        sendMoveTransaction(wallet.address, directionToNumber(direction), result.moveCount, result.score, wallet.walletType || 'metamask')
           .then(hash => {
             console.log('[v0] Transaction response received:', hash);
-            setPendingTx(false);
+            if (!isSilent) setPendingTx(false);
             if (hash) {
               console.log('[v0] Transaction sent, hash:', hash);
               const txRecord: TxRecord = {
@@ -59,6 +61,7 @@ const Index = () => {
               };
               setTransactions(prev => [txRecord, ...prev].slice(0, 50));
               if (wallet.address) wallet.refreshBalance(wallet.address);
+              
               setTimeout(() => {
                 setTransactions(prev =>
                   prev.map(tx => tx.hash === hash ? { ...tx, status: 'confirmed' as const } : tx)
@@ -66,23 +69,27 @@ const Index = () => {
               }, 3000);
             } else {
               console.error('[v0] Transaction rejected - hash is null');
-              toast.error('Transaction rejected or failed', {
-                description: 'Check your wallet for details',
-              });
+              if (!isSilent) {
+                toast.error('Transaction rejected or failed', {
+                  description: 'Check your wallet for details',
+                });
+              }
             }
           })
           .catch((err) => {
             console.error('[v0] Transaction error caught:', err);
-            setPendingTx(false);
-            toast.error('Transaction failed', {
-              description: err?.message || 'Unknown error',
-            });
+            if (!isSilent) setPendingTx(false);
+            if (!isSilent) {
+              toast.error('Transaction failed', {
+                description: err?.message || 'Unknown error',
+              });
+            }
           });
       }
 
       return result;
     });
-  }, [wallet.connected, wallet.address, wallet.chainCorrect, wallet.hasFees, wallet.connect, wallet.refreshBalance]);
+  }, [wallet.connected, wallet.address, wallet.chainCorrect, wallet.hasFees, wallet.walletType, wallet.refreshBalance]);
 
   // Keyboard controls
   useEffect(() => {
