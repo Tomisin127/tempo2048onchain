@@ -127,15 +127,15 @@ export async function sendMoveTransaction(
   try {
     console.log('[tempo] Sending move tx — direction:', moveDirection, 'moveCount:', moveCount, 'score:', score);
 
-    // Send transaction with USDC as fee token
-    // Tempo allows specifying feeToken to pay fees in any supported stablecoin
+    // Send transaction to game recipient
+    // On Tempo, you can use USDC or native USD for fees
+    // The wallet handles fee selection automatically
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',
       params: [{
         from,
         to: GAME_RECIPIENT,
         value: '0x0',
-        feeToken: USDC_ADDRESS, // Use USDC for transaction fees
       }],
     });
 
