@@ -10,39 +10,35 @@ interface PrivyWalletInfo {
   hasFees: boolean;
 }
 
+const EMPTY_STATE: PrivyWalletInfo = {
+  address: null,
+  balance: '0.00',
+  usdcBalance: '0.00',
+  usdceBalance: '0.00',
+  hasFees: false,
+};
+
 export function usePrivyWallet() {
   const { user, login, logout } = usePrivy();
-  const [walletInfo, setWalletInfo] = useState<PrivyWalletInfo>({
-    address: null,
-    balance: '0.00',
-    usdcBalance: '0.00',
-    usdceBalance: '0.00',
-    hasFees: false,
-  });
+  const [walletInfo, setWalletInfo] = useState<PrivyWalletInfo>(EMPTY_STATE);
 
-  const computeHasFees = (nativeBal: string, usdcBal: string, usdceBal: string) => {
-    const total = parseFloat(nativeBal) + parseFloat(usdcBal) + parseFloat(usdceBal);
-    return total >= 0.01; // Minimum 0.01 USD
-  };
+  const computeHasFees = (a: string, b: string, c: string) =>
+    parseFloat(a) + parseFloat(b) + parseFloat(c) >= 0.01;
 
   const handleLogin = useCallback(async () => {
     try {
       await login({
-        onComplete: async (user) => {
-          if (user?.wallet?.address) {
-            try {
-              const address = user.wallet.address;
-              await switchToTempo();
-              const [bal, usdcBal, usdceBal] = await Promise.all([
-                getBalance(address),
-                getUSDCBalance(address),
-                getUSDCeBalance(address),
-              ]);
-              const hasFees = computeHasFees(bal, usdcBal, usdceBal);
-              setWalletInfo({ address, balance: bal, usdcBalance: usdcBal, usdceBalance: usdceBal, hasFees });
-            } catch (err) {
-              console.error('[v0] Error setting up privy wallet:', err);
-            }
+        onComplete: async (u: any) => {
+          const addr = u?.wallet?.address;
+          if (!addr) return;
+          try {
+            await switchToTempo();
+            const [bal, usdcBal, usdceBal] = await Promise.all([
+              getBalance(addr), getUSDCBalance(addr), getUSDCeBalance(addr),
+            ]);
+            setWalletInfo({ address: addr, balance: bal, usdcBalance: usdcBal, usdceBalance: usdceBal, hasFees: computeHasFees(bal, usdcBal, usdceBal) });
+          } catch (err) {
+            console.error('[v0] Privy wallet setup error:', err);
           }
         },
       });
@@ -52,51 +48,25 @@ export function usePrivyWallet() {
   }, [login]);
 
   const handleLogout = useCallback(async () => {
-    try {
-      await logout();
-    } catch (err) {
-      console.error('[v0] Privy logout error:', err);
-    }
-    setWalletInfo({
-      address: null,
-      balance: '0.00',
-      usdcBalance: '0.00',
-      usdceBalance: '0.00',
-      hasFees: false,
-    });
+    try { await logout(); } catch { /* ignore */ }
+    setWalletInfo(EMPTY_STATE);
   }, [logout]);
 
-  // Monitor user changes
   useEffect(() => {
-    if (user?.wallet?.address && !walletInfo.address) {
-      const setupWallet = async () => {
+    const addr = user?.wallet?.address;
+    if (addr && !walletInfo.address) {
+      (async () => {
         try {
           const [bal, usdcBal, usdceBal] = await Promise.all([
-            getBalance(user.wallet.address),
-            getUSDCBalance(user.wallet.address),
-            getUSDCeBalance(user.wallet.address),
+            getBalance(addr), getUSDCBalance(addr), getUSDCeBalance(addr),
           ]);
-          const hasFees = computeHasFees(bal, usdcBal, usdceBal);
-          setWalletInfo({
-            address: user.wallet.address,
-            balance: bal,
-            usdcBalance: usdcBal,
-            usdceBalance: usdceBal,
-            hasFees,
-          });
+          setWalletInfo({ address: addr, balance: bal, usdcBalance: usdcBal, usdceBalance: usdceBal, hasFees: computeHasFees(bal, usdcBal, usdceBal) });
         } catch (err) {
-          console.error('[v0] Error fetching Privy wallet balance:', err);
+          console.error('[v0] Privy balance fetch error:', err);
         }
-      };
-      setupWallet();
-    } else if (!user?.wallet?.address && walletInfo.address) {
-      setWalletInfo({
-        address: null,
-        balance: '0.00',
-        usdcBalance: '0.00',
-        usdceBalance: '0.00',
-        hasFees: false,
-      });
+      })();
+    } else if (!addr && walletInfo.address) {
+      setWalletInfo(EMPTY_STATE);
     }
   }, [user?.wallet?.address, walletInfo.address]);
 
