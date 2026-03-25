@@ -11,7 +11,7 @@ interface PrivyWalletInfo {
 }
 
 export function usePrivyWallet() {
-  const { user, login, logout, linkWallet } = usePrivy();
+  const { user, login, logout } = usePrivy();
   const [walletInfo, setWalletInfo] = useState<PrivyWalletInfo>({
     address: null,
     balance: '0.00',
@@ -52,7 +52,11 @@ export function usePrivyWallet() {
   }, [login]);
 
   const handleLogout = useCallback(async () => {
-    await logout();
+    try {
+      await logout();
+    } catch (err) {
+      console.error('[v0] Privy logout error:', err);
+    }
     setWalletInfo({
       address: null,
       balance: '0.00',
@@ -66,22 +70,26 @@ export function usePrivyWallet() {
   useEffect(() => {
     if (user?.wallet?.address && !walletInfo.address) {
       const setupWallet = async () => {
-        const [bal, usdcBal, usdceBal] = await Promise.all([
-          getBalance(user.wallet.address),
-          getUSDCBalance(user.wallet.address),
-          getUSDCeBalance(user.wallet.address),
-        ]);
-        const hasFees = computeHasFees(bal, usdcBal, usdceBal);
-        setWalletInfo({
-          address: user.wallet.address,
-          balance: bal,
-          usdcBalance: usdcBal,
-          usdceBalance: usdceBal,
-          hasFees,
-        });
+        try {
+          const [bal, usdcBal, usdceBal] = await Promise.all([
+            getBalance(user.wallet.address),
+            getUSDCBalance(user.wallet.address),
+            getUSDCeBalance(user.wallet.address),
+          ]);
+          const hasFees = computeHasFees(bal, usdcBal, usdceBal);
+          setWalletInfo({
+            address: user.wallet.address,
+            balance: bal,
+            usdcBalance: usdcBal,
+            usdceBalance: usdceBal,
+            hasFees,
+          });
+        } catch (err) {
+          console.error('[v0] Error fetching Privy wallet balance:', err);
+        }
       };
       setupWallet();
-    } else if (!user?.wallet?.address) {
+    } else if (!user?.wallet?.address && walletInfo.address) {
       setWalletInfo({
         address: null,
         balance: '0.00',

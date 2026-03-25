@@ -13,6 +13,9 @@ const Header: React.FC<HeaderProps> = ({ score, bestScore, onNewGame }) => {
   const privyWallet = usePrivyWallet();
   const [showWalletOptions, setShowWalletOptions] = useState(false);
 
+  // Check if Privy is available (app ID configured)
+  const privyAvailable = import.meta.env.VITE_PRIVY_APP_ID ? true : false;
+
   // Determine which wallet is active
   const isMetaMaskConnected = metaMaskWallet.connected && metaMaskWallet.walletType === 'metamask';
   const isPrivyConnected = privyWallet.address !== null;
@@ -80,15 +83,17 @@ const Header: React.FC<HeaderProps> = ({ score, bestScore, onNewGame }) => {
               >
                 Connect MetaMask
               </button>
-              <button
-                onClick={() => {
-                  privyWallet.login();
-                  setShowWalletOptions(false);
-                }}
-                className="w-full text-left px-4 py-2 hover:bg-muted text-sm font-semibold"
-              >
-                Login with Email (Privy)
-              </button>
+              {privyAvailable && (
+                <button
+                  onClick={() => {
+                    privyWallet.login();
+                    setShowWalletOptions(false);
+                  }}
+                  className="w-full text-left px-4 py-2 hover:bg-muted text-sm font-semibold"
+                >
+                  Login with Email (Privy)
+                </button>
+              )}
             </div>
           )}
 
