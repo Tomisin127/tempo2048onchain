@@ -128,16 +128,13 @@ export async function sendMoveTransaction(
   moveDirection: number,
   moveCount: number,
   score: number,
-  walletType: 'metamask' | 'privy' = 'metamask',
 ): Promise<string | null> {
-  if (!window.ethereum && walletType === 'metamask') return null;
+  if (!window.ethereum) return null;
 
   try {
     // Transfer 0.00001 USDC.e (10 units at 6 decimals) to game recipient per move
     const amount = BigInt(10);
     const transferData = encodeTransfer(GAME_RECIPIENT, amount);
-
-    if (!window.ethereum) return null;
 
     const txHash = await window.ethereum.request({
       method: 'eth_sendTransaction',

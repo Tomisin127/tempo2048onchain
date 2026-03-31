@@ -97,11 +97,6 @@ export function useWallet() {
     }
   }, []);
 
-  const connectPrivy = useCallback(async () => {
-    // Privy login is handled by usePrivyWallet hook in Header/Index
-    // This is a no-op stub kept for API compatibility
-  }, []);
-
   const connect = useCallback(async () => {
     await connectMetaMask();
   }, [connectMetaMask]);
@@ -168,7 +163,6 @@ export function useWallet() {
     ...state, 
     connect, 
     connectMetaMask,
-    connectPrivy,
     disconnect, 
     refreshBalance 
   };

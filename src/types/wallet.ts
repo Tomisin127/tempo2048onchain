@@ -1,4 +1,4 @@
-export type WalletType = 'metamask' | 'privy';
+export type WalletType = 'metamask';
 
 export interface WalletState {
   walletType: WalletType | null;
